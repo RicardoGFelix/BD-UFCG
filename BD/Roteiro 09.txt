@@ -1,0 +1,164 @@
+-- Roteiro 09 - Views, Functions e Triggers
+-- José Ricardo Galdino Felix
+
+-- Q1: Crie as seguintes views:
+
+-- a) vw_dptmgr: contém apenas o número do departamento e o nome do gerente;
+CREATE VIEW vw_dptmgr (department_number, name_manager) AS SELECT d.dnumber, (g.fname || ' ' || g.minit || '. ' || g.lname) FROM department d, employee g WHERE d.mgrssn=g.ssn;
+
+-- b) vw_empl_houston: contém o ssn e o primeiro nome dos empregados com endereço em Houston;
+CREATE VIEW vw_empl_houston (ssn, first_name) AS SELECT ssn, fname FROM employee WHERE address LIKE '%Houston, TX';
+
+-- c) vw_deptstats: contém o número do departamento, o nome do departamento e o número de funcionários que trabalham no departamento;
+CREATE VIEW vw_deptstats (department_number, department_name, quantity_employees) AS SELECT dnumber, dname, COUNT(*) FROM department AS d INNER JOIN employee AS e ON d.dnumber=e.dno GROUP BY d.dnumber, d.dname;
+
+-- d) vw_projstats: contém o id do projeto e a quantidade de funcionários que trabalham no projeto;
+CREATE VIEW vw_projstats (project_id, quantity_employees) AS SELECT pnumber, COUNT(*) FROM project AS p INNER JOIN works_on AS w ON p.pnumber=w.pno GROUP BY p.pnumber;
+
+
+-- Q2: Faça consultas nas VIEWS para checar se ficaram corretas:
+
+-- Consultando vw_dptmgr
+
+-- Verificando retorno da view vw_dptmgr
+SELECT * FROM vw_dptmgr;
+-- Verificando se os gerentes do sistema realmente foram indicados na view vw_dptmgr a partir do ssn do gerente do departamento, do empregado e do nome completo do empregado (retorno esperado = ssn do gerente deve ser igual ao ssn do empregado e o nome do empregado deve ser igual ao nome do gerente verificando no passo anterior);
+SELECT d.dnumber, d.mgrssn, e.ssn, (e.fname || ' ' || e.minit || '. ' || e.lname) AS employee_name FROM department AS d, employee AS e WHERE d.mgrssn=e.ssn;
+
+
+-- Consultando vw_empl_houston
+
+-- Verificando retorno da view vw_empl_houston
+SELECT * FROM vw_empl_houston;
+-- Verificando se todos os funcionários da view vw_empl_houston possuem endereço em Houston, TX (retorno esperado = endereço com final 'Houston, TX');
+SELECT e.address FROM vw_empl_houston AS vw_eh, employee AS e WHERE vw_eh.ssn=e.ssn;
+-- Verificando quantos funcionários cadastrados no sistema possuem endereço em Houston, TX (retorno esperado = 5);
+SELECT COUNT(*) FROM employee WHERE address LIKE '%Houston, TX';
+
+
+-- Consultando vw_deptstats
+
+-- Verificando retorno da view vw_deptstats
+SELECT * FROM vw_deptstats;
+-- Verificando todos os funcionários de cada departamento (a partir desta consulta é possível contar a quantidade de funcionários de cada departamento, já que o banco de dados está pouco populado);
+SELECT d.dnumber, d.dname, e.ssn FROM department AS d, employee AS e WHERE e.dno=d.dnumber ORDER BY d.dnumber;
+-- Verificando departamento com mais funcionários (retorno esperado = 8);
+SELECT dno AS department_number FROM ((SELECT dno, COUNT(*) FROM employee GROUP BY dno) AS d JOIN (SELECT MAX(COUNT) AS qt FROM (SELECT COUNT(*) FROM employee GROUP BY dno) AS e) AS maximum ON d.COUNT = maximum.qt);
+-- Verificando departamento com menos funcionários (retorno esperado = 1);
+SELECT dno AS department_number FROM ((SELECT dno, COUNT(*) FROM employee GROUP BY dno) AS d JOIN (SELECT MIN(COUNT) AS qt FROM (SELECT COUNT(*) FROM employee GROUP BY dno) AS e) AS minimum ON d.COUNT = minimum.qt);
+
+
+-- Consultando vw_projstats
+
+-- Verificando retorno da view vw_projstats
+SELECT * FROM vw_projstats;
+-- Verificando todos os funcionários de cada projeto (a partir desta consulta é possível contar a quantidade de funcionários de cada projeto, já que o banco de dados está pouco populado);
+SELECT p.pnumber, w.essn FROM project AS p, works_on AS w WHERE w.pno=p.pnumber ORDER BY p.pnumber;
+-- Verificando projeto com mais funcionários (retorno esperado = 61);
+SELECT pno AS project_id FROM ((SELECT pno, COUNT(*) FROM works_on GROUP BY pno) AS p JOIN (SELECT MAX(COUNT) AS qt FROM (SELECT COUNT(*) FROM works_on GROUP BY pno) AS w) AS maximum ON p.COUNT = maximum.qt);
+-- Verificando projeto com menos funcionários (retorno esperado = 1 e 3);
+SELECT pno AS project_id FROM ((SELECT pno, COUNT(*) FROM works_on GROUP BY pno) AS p JOIN (SELECT MIN(COUNT) AS qt FROM (SELECT COUNT(*) FROM works_on GROUP BY pno) AS w) AS minimum ON p.COUNT = minimum.qt);
+
+
+-- Q3: Remova todas as VIEWS criadas:
+
+-- Removendo vw_dptmgr
+DROP VIEW vw_dptmgr;
+
+-- Removendo vw_empl_houston
+DROP VIEW vw_empl_houston;
+
+-- Removendo vw_deptstats
+DROP VIEW vw_deptstats;
+
+-- Removendo vw_projstats
+DROP VIEW vw_projstats;
+
+
+-- Q4: Crie uma FUNCTION chamada check_age
+CREATE OR REPLACE FUNCTION check_age(Essn CHAR(9)) RETURNS VARCHAR(7) AS $$ DECLARE age INT; BEGIN SELECT EXTRACT(year from age(CURRENT_DATE, bdate)) INTO age FROM employee WHERE ssn=Essn; IF age >= 50 THEN RETURN 'SENIOR'; ELSIF age < 1 THEN RETURN 'INVALID'; ELSIF age < 50 THEN RETURN 'YOUNG'; ELSE RETURN 'UNKNOWN'; END IF; END; $$ LANGUAGE plpgsql;
+
+-- Testando função check_age;
+SELECT check_age('666666609');
+SELECT check_age('555555500');
+SELECT check_age('987987987');
+SELECT check_age('x');
+SELECT check_age(null);
+SELECT ssn FROM employee WHERE check_age(ssn) = 'SENIOR';
+
+
+-- Q5: Crie uma TRIGGER PROCEDURE chamada check_mgr que monitora as atualizações (INSERT/UPDATE) realizadas na tabela departament, não permitindo que um gerente inadequado seja alocado a um departamento;
+
+-- Criando PROCEDURE;
+CREATE OR REPLACE FUNCTION check_mgr() RETURNS TRIGGER AS $check_mgr$ DECLARE status_age VARCHAR(7); employee_dno INT; qt_subordinates INT; BEGIN SELECT check_age(ssn) INTO status_age FROM employee WHERE ssn = NEW.mgrssn; SELECT dno INTO employee_dno FROM employee WHERE ssn = NEW.mgrssn; SELECT COUNT(*) INTO qt_subordinates FROM employee WHERE superssn = NEW.mgrssn GROUP BY superssn; IF (employee_dno IS NULL OR NOT(employee_dno=NEW.dnumber)) THEN RAISE EXCEPTION 'manager must be a department''s employee'; END IF; IF NOT(status_age='SENIOR') THEN RAISE EXCEPTION 'manager must be a SENIOR employee'; END IF; IF qt_subordinates IS NULL THEN RAISE EXCEPTION 'manager must have supevisees'; END IF; RETURN NEW; END; $check_mgr$ LANGUAGE plpgsql;
+
+-- Criando TRIGGER;
+CREATE TRIGGER check_mgr BEFORE INSERT OR UPDATE OF mgrssn ON department FOR EACH ROW EXECUTE PROCEDURE check_mgr();
+
+-- a) Caso já tenha criado, remova a trigger:
+
+-- Removendo trigger;
+DROP TRIGGER check_mgr ON department;
+
+
+-- b) Insira um departamento com dnumber = 2, tendo como gerente o empregado com ssn = '999999999'.
+
+-- isso deve funcionar pois não existe uma FK para validar se o employee existe
+INSERT INTO department VALUES ('Test', 2, '999999999', now());
+
+
+-- c) Insira um novo employee com ssn = '999999999' e que atenda aos requisitos 2 e 3 para ser gerente. Insira também um subordinado.
+
+-- employee '999999999'
+INSERT INTO employee VALUES ('Joao','A','Silva','999999999','10-OCT-1950','123 Peachtree, Atlanta, GA','M',85000,null,2);
+
+-- employee '999999998', subordinado ao anterior
+INSERT INTO employee VALUES ('Jose','A','Santos','999999998','10-OCT-1950','123 Peachtree, Atlanta, GA','M',85000,'999999999',2);
+
+
+-- d) Crie a trigger;
+
+-- Criando a trigger;
+CREATE TRIGGER check_mgr BEFORE INSERT OR UPDATE OF mgrssn ON department FOR EACH ROW EXECUTE PROCEDURE check_mgr();
+
+
+-- e) Agora execute os comandos abaixo e verifique se obteve os mesmos resultados.
+
+-- o update deve funcionar normalmente
+UPDATE department SET mgrssn = '999999999' WHERE dnumber=2;
+
+-- não permite executar update
+-- dependendo da forma como a trigger foi implementada, você pode ter uma validação pela FK not-null ou pela trigger após executar o UPDATE:
+
+UPDATE department SET mgrssn = null WHERE dnumber=2;
+
+-- não permite executar update porque esse employee não existe
+-- isso poderia ser verificado por uma FK department.mgrssn → employee.ssn, mas essa FK não existe
+UPDATE department SET mgrssn = '999' WHERE dnumber=2;
+
+-- não permite executar update pois o employee não é do departamento
+UPDATE department SET mgrssn = '111111100' WHERE dnumber=2;
+
+-- altera a data de nascimento do employee para que ele deixe de ser Sênior
+UPDATE employee SET bdate = '10-OCT-2000' WHERE ssn = '999999999';
+
+-- não permite executar update
+UPDATE department SET mgrssn = '999999999' WHERE dnumber=2;
+
+-- altera a data de nascimento do employee para que ele volte a ser Sênior
+UPDATE employee SET bdate = '10-OCT-1950' WHERE ssn = '999999999';
+
+-- o update deve funcionar normalmente
+UPDATE department SET mgrssn = '999999999' WHERE dnumber=2;
+
+--remove os subordinados
+DELETE FROM employee WHERE superssn = '999999999';
+
+-- não permite executar update pois o empregado não tem subordinados
+UPDATE department SET mgrssn = '999999999' WHERE dnumber=2;
+
+--remove o employee '999999999'
+DELETE FROM employee WHERE ssn = '999999999';
+
+--Remove o departamento 2
+DELETE FROM department where dnumber=2;

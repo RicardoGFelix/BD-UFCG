@@ -1,0 +1,127 @@
+-- Roteiro 03 - José Ricardo Galdino Felix
+
+-- Criando tabela de farmacias e pk
+CREATE TABLE farmacia (id SERIAL, bairro VARCHAR(50) NOT NULL, cidade VARCHAR(50) NOT NULL, estado CHAR(2) NOT NULL, unidade VARCHAR(6) NOT NULL, cpf_gerente CHAR(11) NOT NULL, PRIMARY KEY(id));
+
+-- Criando tabela de funcionarios e pk
+CREATE TABLE funcionario (cpf CHAR(11), nome VARCHAR(140), funcao VARCHAR(25) NOT NULL, id_farmacia INT, PRIMARY KEY(cpf));
+
+-- Criando tabela de medicamento e pk
+CREATE TABLE medicamento (id SERIAL, nome VARCHAR(140), fabricante VARCHAR(140), is_exclusivo BOOLEAN NOT NULL, PRIMARY KEY(id));
+
+-- Criando tabela de venda e pk
+CREATE TABLE venda(id SERIAL, valor NUMERIC NOT NULL, funcionario_cpf CHAR(11) NOT NULL, id_medicamento INT NOT NULL, cliente_cpf CHAR(11) NOT NULL, PRIMARY KEY(id));
+
+--Criando tabela de cliente e pk
+CREATE TABLE cliente (cpf char(11), nome VARCHAR(140), contato VARCHAR(80) NOT NULL, is_cadastrado BOOLEAN NOT NULL, PRIMARY KEY(cpf));
+
+-- Criando tabela de endereco e pk
+CREATE TABLE endereco (id SERIAL, cliente_cpf CHAR(11) NOT NULL,rua VARCHAR(60) NOT NULL, numero VARCHAR(10) NOT NULL, bairro VARCHAR(40) NOT NULL, cidade VARCHAR(40) NOT NULL, estado CHAR(2) NOT NULL, PRIMARY KEY(id));
+
+-- Criando tabela de entrega e pk
+CREATE TABLE entrega (id SERIAL, data TIMESTAMP NOT NULL, id_farmacia INT NOT NULL, endereco_cliente INT NOT NULL, id_venda INT NOT NULL, PRIMARY KEY(id));
+
+-- Add fk's
+ALTER TABLE farmacia ADD CONSTRAINT id_gerente_fk FOREIGN KEY (cpf_gerente) REFERENCES funcionario(cpf);
+
+ALTER TABLE venda ADD CONSTRAINT id_medicamento_fk FOREIGN KEY (id_medicamento) REFERENCES medicamento(id);
+ALTER TABLE venda ADD CONSTRAINT id_funcionario_fk FOREIGN KEY (funcionario_cpf) REFERENCES funcionario(cpf);
+
+ALTER TABLE entrega ADD CONSTRAINT endereco_cliente_fk FOREIGN KEY (endereco_cliente) REFERENCES endereco(id);
+ALTER TABLE entrega ADD CONSTRAINT id_venda_fk FOREIGN KEY (id_venda) REFERENCES venda(id);
+
+ALTER TABLE endereco ADD CONSTRAINT id_cliente_fk FOREIGN KEY (cliente_cpf) REFERENCES cliente(cpf);
+
+--  r1: unidade de farmacia só pode ser sede ou filial
+ALTER TABLE farmacia ADD CONSTRAINT check_unidade CHECK (unidade='sede' OR unidade='filial');
+
+-- r2: funcao de funcionario só pode ser farm, vend, ent, caixa ou adm
+ALTER TABLE funcionario ADD CONSTRAINT check_funcao CHECK (funcao='farmaceutico' OR funcao='vendedor' OR funcao='entregador' OR funcao='caixa' OR funcao='administrador');
+
+-- r3, r4, r5, r6 já contempladas
+
+-- r7: tipo de endereco só pode ser residencia, trabalho ou outro
+ALTER TABLE endereco ADD CONSTRAINT check_tipo_endereco CHECK (tipo='residencia' OR tipo='trabalho' OR tipo='outro');
+
+-- r8 e r9 já contempladas
+
+-- r10: outras vendas realizadas para qualquer cliente
+ALTER TABLE venda ALTER COLUMN cliente_cpf DROP NOT NULL;
+
+-- r11, r12 já contempladas
+
+-- r13: só clientes maiores de 18 anos podem realizar compras
+
+-- Adicionando ano de nascimento a um cliente
+ALTER TABLE cliente ADD COLUMN ano_nascimento INT NOT NULL;
+
+-- Adicionando restricao de idade
+ALTER TABLE cliente ADD CONSTRAINT maior_de_idade_check CHECK (extract(year from CURRENT_TIMESTAMP)-ano_nascimento>=18);
+
+-- r14: Não podem haver duas ou mais farmacias em um bairro
+ALTER TABLE farmacia ADD CONSTRAINT bairro_unique UNIQUE (bairro);
+
+-- r15: Só pode haver uma sede no sistema
+ALTER TABLE farmacia  ADD CONSTRAINT is_sede EXCLUDE USING gist (unidade WITH =) WHERE (unidade='sede');
+
+-- r16: gerente só pode ser farmaceutico ou administrador
+
+-- Removendo fk's que referenciam funcionario
+ALTER TABLE farmacia DROP CONSTRAINT id_gerente_fk;
+ALTER TABLE venda DROP CONSTRAINT id_funcionario_fk;
+
+-- Adicionando campo de funcao do funcionario em farmacia e em venda
+ALTER TABLE farmacia ADD COLUMN funcao_gerente VARCHAR(25) NOT NULL;
+ALTER TABLE venda ADD COLUMN funcionario_funcao VARCHAR(25) NOT NULL;
+
+-- Redefinindo primary key de funcionario
+ALTER TABLE funcionario DROP CONSTRAINT funcionario_pkey;
+ALTER TABLE funcionario ADD PRIMARY KEY (cpf, funcao);
+
+-- Adicionando fk de funcao_gerente para funcao
+ALTER TABLE farmacia ADD CONSTRAINT gerente_fk FOREIGN KEY (cpf_gerente, funcao_gerente) REFERENCES funcionario (cpf, funcao);
+ALTER TABLE venda ADD CONSTRAINT funcionario_fk FOREIGN KEY (funcionario_cpf, funcionario_funcao) REFERENCES funcionario (cpf, funcao);
+
+-- Adicionando restricao de funcao de gerente em farmacia
+ALTER TABLE farmacia ADD CONSTRAINT funcao_gerente_check CHECK (funcao_gerente='farmaceutico' OR funcao_gerente='administrador');
+
+-- r17: medicamento exclusivo só pode ser vendido para clientes cadastrados
+
+-- Removendo fk's que referenciam medicamento e cliente
+ALTER TABLE venda DROP CONSTRAINT id_medicamento_fk;
+ALTER TABLE endereco DROP CONSTRAINT id_cliente_fk;
+
+-- Adicionando campo de exclusividade de medicamento e de cadastro de cliente em venda
+ALTER TABLE venda ADD COLUMN medicamento_exclusivo BOOLEAN NOT NULL;
+
+ALTER TABLE venda ADD COLUMN cliente_cadastrado BOOLEAN NOT NULL;
+ALTER TABLE endereco ADD COLUMN cliente_cadastrado BOOLEAN NOT NULL;
+
+-- Redefinindo a primary key de medicamento
+ALTER TABLE medicamento DROP CONSTRAINT medicamento_pkey;
+ALTER TABLE medicamento ADD PRIMARY KEY (id, is_exclusivo);
+
+ALTER TABLE cliente DROP CONSTRAINT cliente_pkey;
+ALTER TABLE cliente ADD PRIMARY KEY (cpf, is_cadastrado);
+
+-- Adicionando fk
+ALTER TABLE venda ADD CONSTRAINT medicamento_fk FOREIGN KEY (id_medicamento, medicamento_exclusivo) REFERENCES medicamento (id, is_exclusivo);
+
+ALTER TABLE venda ADD CONSTRAINT cliente_fk FOREIGN KEY (cliente_cpf, cliente_cadastrado) REFERENCES cliente (cpf, is_cadastrado);
+ALTER TABLE endereco ADD CONSTRAINT cliente_fk FOREIGN KEY (cliente_cpf, cliente_cadastrado) REFERENCES cliente (cpf, is_cadastrado);
+
+
+-- Adicionando restricao de medicamentos exclusivos
+ALTER TABLE venda ADD CONSTRAINT client_check CHECK (NOT (medicamento_exclusivo='true') OR cliente_cadastrado='true');
+
+-- r18: uma venda só deve ser feita por um vendedor
+ALTER TABLE venda ADD CONSTRAINT funcionario_vendedor_check CHECK (funcionario_funcao='vendedor');
+
+-- Criando tipo estados_nordestinos
+CREATE TYPE estados_nordestinos AS ENUM('PB','PE','AL','BA' ,'RN','MA', 'PI', 'CE', 'SE') ;
+
+-- Removendo coluna estado em farmacia
+ALTER TABLE farmacia DROP COLUMN estado;
+
+-- Adicionando coluna estado em farmacia com tipo estados_nordestinos
+ALTER TABLE farmacia ADD COLUMN estado estados_nordestinos;
