@@ -1,0 +1,265 @@
+-- Roteiro 1 - José Ricardo Galdino Felix
+
+-- Questão 1: Definindo atributos para cada uma das tabelas
+
+-- seguro: protocolo, empresa, valor, validade, plano
+-- automovel: vin, placa, cpf_do_dono, modelo, fabricante, ano, cor
+-- segurado: cpf, seguro, idade, sexo, nome, endereco, email, telefone
+-- sinistro: protocolo, automovel, horario, local, tipo_de_incidente
+-- perito: cpf, nome, empresa
+-- pericia: protocolo, perito, automovel, tipo_de_dano, nivel_de_dano, descricao, valor, eh_reparavel
+-- oficina: cnpj, endereco, telefone, nome, email, site
+-- reparo: protocolo, automovel, sinistro, oficina, valor, categoria, nivel 
+
+-- Questão 2: Criando tabelas.
+
+CREATE TABLE "seguro" (
+  "protocolo" VARCHAR(60) NULL, 
+  "empresa" VARCHAR(140) NULL, 
+  "valor" NUMERIC NULL, 
+  "validade" DATE NULL, 
+  "plano" VARCHAR(70) NULL);
+
+CREATE TABLE "segurado" (
+  "cpf" CHAR(11) NULL, 
+  "seguro" VARCHAR(60) NULL, 
+  "idade" INTEGER NULL, 
+  "sexo" VARCHAR(15) NULL, 
+  "nome" VARCHAR(200) NULL, 
+  "endereco" TEXT NULL, 
+  "email" TEXT NULL, 
+  "telefone" VARCHAR(20) NULL);
+
+CREATE TABLE "automovel" (
+  "vin" VARCHAR(17) NULL,
+  "placa" VARCHAR(8) NULL,
+  "cpf_do_dono" CHAR(11) NULL, 
+  "modelo" VARCHAR(80) NULL, 
+  "fabricante" VARCHAR(40) NULL, 
+  "ano" INTEGER NULL, 
+  "cor" VARCHAR(30) NULL);
+  
+CREATE TABLE "sinistro" (
+  "protocolo" VARCHAR(60) NULL, 
+  "automovel" VARCHAR(17) NULL, 
+  "horario" TIMESTAMP NULL, 
+  "local" TEXT NULL, 
+  "tipo_de_incidente" VARCHAR(140) NULL);
+  
+CREATE TABLE "perito" (
+  "cpf" CHAR(11) NULL, 
+  "nome" VARCHAR(140) NULL, 
+  "empresa" VARCHAR(200) NULL);
+  
+CREATE TABLE "pericia" (
+  "protocolo" VARCHAR(60) NULL, 
+  "perito" CHAR(11) NULL, 
+  "automovel" VARCHAR(17) NULL, 
+  "tipo_de_dano" VARCHAR(200) NULL, 
+  "nivel_de_dano" VARCHAR(200) NULL, 
+  "descricao" TEXT NULL, "valor" NUMERIC NULL, 
+  "eh_reparavel" BOOLEAN NULL);
+  
+CREATE TABLE "oficina" (
+  "cnpj" CHAR(14) NULL, 
+  "endereco" TEXT NULL, 
+  "telefone" VARCHAR(20) NULL, 
+  "nome" VARCHAR(140) NULL, 
+  "email" TEXT NULL, 
+  "site" TEXT NULL);
+  
+CREATE TABLE "reparo" (
+  "protocolo" VARCHAR(60) NULL, 
+  "automovel" VARCHAR(17) NULL, 
+  "sinistro" VARCHAR(60) NULL, 
+  "oficina" CHAR(14) NULL, 
+  "valor" NUMERIC NULL, 
+  "tipo_de_reparo" VARCHAR(200) NULL, 
+  "nivel_de_reparo" VARCHAR(200) NULL);
+  
+-- Questão 3: Definindo Primary Keys:  
+  
+ALTER TABLE "seguro" ADD PRIMARY KEY ("protocolo");
+ALTER TABLE "segurado" ADD PRIMARY KEY ("cpf");
+ALTER TABLE "automovel" ADD PRIMARY KEY ("vin");
+ALTER TABLE "sinistro" ADD PRIMARY KEY ("protocolo");
+ALTER TABLE "perito" ADD PRIMARY KEY ("cpf");
+ALTER TABLE "pericia" ADD PRIMARY KEY ("protocolo");
+ALTER TABLE "oficina" ADD PRIMARY KEY ("cnpj");
+ALTER TABLE "reparo" ADD PRIMARY KEY ("protocolo");
+
+-- Questão 4: Definindo Foreign Keys:
+
+-- segurado
+ALTER TABLE "segurado" ADD CONSTRAINT "protocolo_do_seguro" FOREIGN KEY ("seguro") REFERENCES "seguro" ("protocolo");
+
+-- automovel
+ALTER TABLE "automovel" ADD CONSTRAINT "cpf_do_segurado" FOREIGN KEY ("cpf_do_dono") REFERENCES "segurado" ("cpf");
+
+-- sinistro
+ALTER TABLE "sinistro" ADD CONSTRAINT "vin_do_automovel" FOREIGN KEY ("automovel") REFERENCES "automovel" ("vin");
+
+-- pericia
+ALTER TABLE "pericia" ADD CONSTRAINT "vin_do_automovel" FOREIGN KEY ("automovel") REFERENCES "automovel" ("vin");
+ALTER TABLE "pericia" ADD CONSTRAINT "cpf_do_perito" FOREIGN KEY ("perito") REFERENCES "perito" ("cpf");
+
+-- reparo
+ALTER TABLE "reparo" ADD CONSTRAINT "vin_do_automovel" FOREIGN KEY ("automovel") REFERENCES "automovel" ("vin");
+ALTER TABLE "reparo" ADD CONSTRAINT "protocolo_do_sinistro" FOREIGN KEY ("sinistro") REFERENCES "sinistro" ("protocolo");
+ALTER TABLE "reparo" ADD CONSTRAINT "cnpj_da_oficina" FOREIGN KEY ("oficina") REFERENCES "oficina" ("cnpj");
+
+-- Questão 5: Definindo atributos Not Null.
+
+-- seguro
+ALTER TABLE  "seguro" 
+ALTER COLUMN "valor" SET NOT NULL, 
+ALTER COLUMN "validade" SET NOT NULL, 
+ALTER COLUMN "plano" SET NOT NULL;
+
+-- automovel
+ALTER TABLE "automovel" ALTER COLUMN "cpf_do_dono" SET NOT NULL;  
+
+-- segurado
+ALTER TABLE "segurado" 
+ALTER COLUMN "seguro" SET NOT NULL, 
+ALTER COLUMN "endereco" SET NOT NULL, 
+ALTER COLUMN "telefone" SET NOT NULL;
+
+-- sinistro
+ALTER TABLE "sinistro" 
+ALTER COLUMN "automovel" SET NOT NULL, 
+ALTER COLUMN "tipo_de_incidente" SET NOT NULL;
+
+-- pericia
+ALTER TABLE "pericia" 
+ALTER COLUMN "perito" SET NOT NULL, 
+ALTER COLUMN "automovel" SET NOT NULL, 
+ALTER COLUMN "descricao" SET NOT NULL, 
+ALTER COLUMN "valor" SET NOT NULL;
+
+-- oficina
+ALTER TABLE "oficina" 
+ALTER COLUMN "endereco" SET NOT NULL, 
+ALTER COLUMN "telefone" SET NOT NULL;
+
+-- reparo
+ALTER TABLE "reparo" 
+ALTER COLUMN "automovel" SET NOT NULL, 
+ALTER COLUMN "sinistro" SET NOT NULL, 
+ALTER COLUMN "oficina" SET NOT NULL, 
+ALTER COLUMN "valor" SET NOT NULL;
+
+-- Questão 6: Removendo tabelas criadas.
+
+DROP TABLE "reparo";
+DROP TABLE "oficina";
+DROP TABLE "pericia";
+DROP TABLE "perito";
+DROP TABLE "sinistro";
+DROP TABLE "automovel";
+DROP TABLE "segurado";
+DROP TABLE "seguro";
+
+-- Questão 7/8: Reescrever os comandos e criar tabelas.
+
+-- seguro
+CREATE TABLE "seguro" (
+  "protocolo" VARCHAR(60) NULL , 
+  "empresa" VARCHAR(140) NULL, 
+  "valor" NUMERIC NOT NULL, 
+  "validade" DATE NOT NULL, 
+  "plano" VARCHAR(70) NOT NULL, 
+  PRIMARY KEY("protocolo"));
+  
+-- segurado
+CREATE TABLE "segurado" (
+  "cpf" CHAR(11) NULL, 
+  "seguro" VARCHAR(60) NOT NULL, 
+  "idade" INTEGER NULL, 
+  "sexo" VARCHAR(15) NULL, 
+  "nome" VARCHAR(200) NULL, 
+  "endereco" TEXT NOT NULL, 
+  "email" TEXT NULL, 
+  "telefone" VARCHAR(20) NOT NULL, 
+  PRIMARY KEY("cpf"), 
+  FOREIGN KEY("seguro") REFERENCES "seguro" ("protocolo"));
+
+-- automovel
+CREATE TABLE "automovel" (
+  "vin" VARCHAR(17) NULL, 
+  "placa" VARCHAR(8) NOT NULL, 
+  "cpf_do_dono" CHAR(11) NOT NULL, 
+  "modelo" VARCHAR(80) NULL, 
+  "fabricante" VARCHAR(40) NULL, 
+  "ano" INTEGER NULL, 
+  "cor" VARCHAR(30) NULL, 
+  PRIMARY KEY("vin"), 
+  FOREIGN KEY("cpf_do_dono") REFERENCES "segurado" ("cpf"));
+  
+-- sinistro
+CREATE TABLE "sinistro" (
+  "protocolo" VARCHAR(60) NULL, 
+  "automovel" VARCHAR(17) NOT NULL, 
+  "horario" TIMESTAMP NULL, 
+  "local" TEXT NULL, 
+  "tipo_de_incidente" VARCHAR(140) NOT NULL,
+  PRIMARY KEY("protocolo"),
+  FOREIGN KEY("automovel") REFERENCES "automovel" ("vin"));
+  
+-- perito
+CREATE TABLE "perito" (
+  "cpf" CHAR(11) NULL, 
+  "nome" VARCHAR(140) NULL, 
+  "empresa" VARCHAR(200) NULL,
+  PRIMARY KEY("cpf"));
+  
+-- pericia
+CREATE TABLE "pericia" (
+  "protocolo" VARCHAR(60) NULL, 
+  "perito" CHAR(11) NOT NULL, 
+  "automovel" VARCHAR(17) NOT NULL, 
+  "tipo_de_dano" VARCHAR(200) NULL, 
+  "nivel_de_dano" VARCHAR(200) NULL, 
+  "descricao" TEXT NOT NULL, 
+  "valor" NUMERIC NOT NULL, 
+  "eh_reparavel" BOOLEAN NULL, 
+  PRIMARY KEY("protocolo"), 
+  FOREIGN KEY("automovel") REFERENCES "automovel" ("vin"), 
+  FOREIGN KEY("perito") REFERENCES "perito" ("cpf"));
+  
+-- oficina
+CREATE TABLE "oficina" (
+  "cnpj" CHAR(14) NULL, 
+  "endereco" TEXT NOT NULL, 
+  "telefone" VARCHAR(20) NOT NULL, 
+  "nome" VARCHAR(140) NULL, 
+  "email" TEXT NULL, 
+  "site" TEXT NULL,
+  PRIMARY KEY("cnpj"));
+  
+-- reparo
+CREATE TABLE "reparo" (
+  "protocolo" VARCHAR(60) NULL, 
+  "automovel" VARCHAR(17) NOT NULL, 
+  "sinistro" VARCHAR(60) NOT NULL, 
+  "oficina" CHAR(14) NOT NULL, 
+  "valor" NUMERIC NOT NULL, 
+  "tipo_de_reparo" VARCHAR(200) NULL, 
+  "nivel_de_reparo" VARCHAR(200) NULL,
+  PRIMARY KEY("protocolo"),
+  FOREIGN KEY("automovel") REFERENCES "automovel" ("vin"),
+  FOREIGN KEY("sinistro") REFERENCES "sinistro" ("protocolo"),
+  FOREIGN KEY("oficina") REFERENCES "oficina" ("cnpj"));
+  
+-- Questão 9: Removendo todas as tabelas novamente.
+
+DROP TABLE "reparo";
+DROP TABLE "oficina";
+DROP TABLE "pericia";
+DROP TABLE "perito";
+DROP TABLE "sinistro";
+DROP TABLE "automovel";
+DROP TABLE "segurado";
+DROP TABLE "seguro";
+
+
